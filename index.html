@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#071116" />
+    <meta name="description" content="Model-Parafoil_8DOF 仿真结果三维回放与飞行数据演示。" />
+    <link rel="icon" type="image/svg+xml" href="/UAV-Parafoil-demo/favicon.svg" />
+    <title>翼伞 8DOF · 仿真任务回放</title>
+    <script type="module" crossorigin src="/UAV-Parafoil-demo/assets/index-DWnE5WwL.js"></script>
+    <link rel="stylesheet" crossorigin href="/UAV-Parafoil-demo/assets/index-BPAxEOzS.css">
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+          <div><strong>PARAFOIL / 8DOF</strong><span>自主应急安全降落 · 仿真任务回放</span></div>
+        </div>
+        <div class="mission-stats" aria-label="任务状态">
+          <div><span>仿真时间</span><b id="metric-time">00:00.00</b></div>
+          <div><span>载荷高度</span><b id="metric-altitude">— m</b></div>
+          <div><span>载荷动能</span><b id="metric-ke">— J</b></div>
+          <div><span>地速</span><b id="metric-speed">— m/s</b></div>
+          <div title="载荷当前位置到目标点的三维直线距离"><span>目标距离</span><b id="metric-distance">— m</b></div>
+          <div><span>伞翼滑翔比</span><b id="metric-glide-ratio">—</b></div>
+        </div>
+        <div class="header-status" aria-live="polite">
+          <div class="status-pill">
+            <span class="status-dot" aria-hidden="true"></span>
+            <b id="status-label">正在载入仿真数据</b>
+          </div>
+          <div class="status-pill data-status-pill">
+            <span class="status-dot" aria-hidden="true"></span>
+            <b id="data-name-label" title="当前数据：未加载">当前数据：未加载</b>
+          </div>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="scene-panel" aria-label="三维仿真回放">
+          <canvas id="scene-canvas"></canvas>
+          <div id="loading" class="loading-card"><span class="loader"></span><b>正在准备仿真场景</b><small>解析轨迹与姿态数据</small></div>
+          <div class="scene-badges">
+            <span><i class="dot canopy-dot"></i>伞翼轨迹</span>
+            <span><i class="dot payload-dot"></i>载荷轨迹</span>
+            <span><i class="dot plan-dot"></i>规划轨迹</span>
+            <span><i class="dot target-dot"></i>安全着陆区</span>
+            <span><i class="dot terrain-dot"></i>地图地形</span>
+            <span><i class="dot risk-dot"></i>人口/财产高风险区</span>
+            <span><i class="dot buffer-dot"></i>建筑禁入缓冲</span>
+          </div>
+          <div class="orientation-card" aria-hidden="true">
+            <div class="compass"><span>N</span><i id="compass-needle"></i></div>
+            <small>航向</small><b id="heading-value">000°</b>
+          </div>
+          <div class="camera-hint">左键旋转 · 滚轮缩放 · 中键平移</div>
+          <div id="map-attribution" class="map-attribution" hidden></div>
+        </section>
+
+        <aside class="telemetry">
+          <div class="panel-heading"><div><span>FLIGHT TELEMETRY</span><h1>飞行状态</h1></div><button id="fullscreen-btn" class="icon-btn" title="全屏" aria-label="全屏">⛶</button></div>
+
+          <section class="attitude-card">
+            <div class="attitude-visual"><div id="horizon" class="horizon"><div class="sky"></div><div class="ground"></div><div class="horizon-line"></div></div><div class="aircraft-symbol">━╋━</div></div>
+            <div class="attitude-values">
+              <div><span>滚转 ROLL</span><b id="roll-value">0.0°</b></div>
+              <div><span>俯仰 PITCH</span><b id="pitch-value">0.0°</b></div>
+              <div><span>偏航 YAW</span><b id="yaw-value">0.0°</b></div>
+            </div>
+          </section>
+
+          <section class="data-grid">
+            <div><span>北向位置</span><b id="north-value">—</b><small>m</small></div>
+            <div><span>东向位置</span><b id="east-value">—</b><small>m</small></div>
+            <div><span>伞翼高度</span><b id="canopy-altitude">—</b><small>m</small></div>
+            <div><span>风速</span><b id="wind-value">—</b><small>m/s</small></div>
+            <div title="由翼伞机体系空速计算"><span>伞翼迎角</span><b id="alpha-value">—</b><small>deg</small></div>
+            <div title="由翼伞机体系空速计算"><span>伞翼侧滑角</span><b id="beta-value">—</b><small>deg</small></div>
+            <div title="载荷水平地速"><span>载荷前进速度</span><b id="horizontal-speed-value">—</b><small>m/s</small></div>
+            <div title="载荷下降为正"><span>载荷下降速度</span><b id="descent-speed-value">—</b><small>m/s</small></div>
+            <div title="模型状态 thetaRel"><span>相对俯仰</span><b id="relative-pitch">—</b><small>deg</small></div>
+            <div title="模型状态 psiRel"><span>相对偏航</span><b id="relative-yaw">—</b><small>deg</small></div>
+            <div class="current-plan-cell"><span>当前规划</span><b id="plan-value">等待</b><small id="plan-reason">未记录</small><small id="plan-eta"></small></div>
+            <div><span>规划状态</span><b id="plan-status">—</b><small id="plan-error"></small></div>
+          </section>
+
+          <section class="control-card decision-card" aria-label="可达集与候选区决策">
+            <div class="section-title"><span>LANDING DECISION</span></div>
+            <div class="decision-summary"><b id="decision-lock">未记录</b><small id="reach-status">未记录可达集</small></div>
+            <div id="decision-detail" class="decision-stats">
+              <div class="decision-selection-row"><b id="decision-selected">当前候选 未记录</b><span class="decision-separator" aria-hidden="true">·</span><span id="decision-attempt-count">替代候选尝试 —</span></div>
+              <span id="decision-screen-count">外包络排除 — / 准入 —</span>
+              <span id="decision-lock-height">锁定门限 — m</span>
+            </div>
+            <button id="next-decision-btn" class="option-button">下一次决策 / 可达集更新</button>
+          </section>
+          <section class="control-card">
+            <div class="section-title"><span>CONTROL INPUT</span><b>刹车偏转</b></div>
+            <div class="brake-row"><span>左侧 δL</span><div class="bar"><i id="left-brake-bar"></i></div><b id="left-brake">0.0°</b></div>
+            <div class="brake-row"><span>右侧 δR</span><div class="bar"><i id="right-brake-bar"></i></div><b id="right-brake">0.0°</b></div>
+          </section>
+
+          <section class="chart-card">
+            <div class="section-title"><span>MISSION PROFILE</span><b>高度 / 地速</b></div>
+            <canvas id="profile-chart" aria-label="高度和地速历史曲线"></canvas>
+            <div class="chart-legend"><span><i class="alt-line"></i>载荷高度</span><span><i class="speed-line"></i>地速</span></div>
+          </section>
+        </aside>
+      </main>
+
+      <footer class="transport">
+        <div class="playback-buttons">
+          <button id="restart-btn" title="回到起点" aria-label="回到起点">↶</button>
+          <button id="step-back-btn" title="上一帧" aria-label="上一帧">‹</button>
+          <button id="play-btn" class="play-button" title="播放或暂停" aria-label="播放">▶</button>
+          <button id="step-forward-btn" title="下一帧" aria-label="下一帧">›</button>
+          <button id="next-plan-btn" title="下一次重规划" aria-label="下一次重规划">⇥</button>
+        </div>
+        <div class="timeline-wrap">
+          <div class="timeline-labels"><b id="current-time">00:00.00</b><span id="event-label">仿真开始</span><b id="duration-time">00:00.00</b></div>
+          <input id="timeline" type="range" min="0" max="10000" value="0" aria-label="仿真时间轴" />
+        </div>
+        <div class="playback-options">
+          <label>速度<select id="speed-select" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+          <label>相机<select id="camera-select" aria-label="相机模式"><option value="free">自由观察</option><option value="canopy" selected>跟随伞翼</option><option value="payload">跟随载荷</option><option value="landing">着陆区固定</option><option value="top">俯视轨迹</option><option value="side">侧视下降</option></select></label>
+          <label>演示地图<select id="demo-select" aria-label="演示地图"><option value="synthetic" selected>合成地图</option><option value="polyu">PolyU地图</option></select></label>
+          <button id="reset-view-btn" class="option-button" title="恢复当前相机模式的默认视角">视角复位</button>
+          <button id="layers-btn" class="option-button">图层</button>
+          <button id="load-btn" class="option-button" title="直接载入 simOut.mat 或回放 JSON">载入 MAT/JSON</button>
+          <input id="file-input" type="file" accept=".mat,.json,application/json,application/x-matlab-data" hidden />
+        </div>
+        <div id="layers-menu" class="layers-menu" hidden>
+          <label><input type="checkbox" data-layer="canopyTrail" />伞翼轨迹</label>
+          <label><input type="checkbox" data-layer="payloadTrail" checked />载荷轨迹</label>
+          <label><input type="checkbox" data-layer="guidance" checked />规划与重规划</label>
+          <label title="开放式线框显示节点截面、中点截面及其连通关系"><input type="checkbox" data-layer="guidanceCorridor" />粗航路凸走廊</label>
+          <label><input type="checkbox" data-layer="replanMarkers" checked />重规划点</label>
+          <label><input type="checkbox" data-layer="safeZone" checked />安全区约束</label>
+          <label><input type="checkbox" data-layer="candidateSites" checked />全部候选区</label>
+          <label><input type="checkbox" data-layer="reachability" checked />可达集与筛选外包络</label>
+          <label><input type="checkbox" data-layer="reachHistory" checked />历史可达集叠加</label>
+          <label><input type="checkbox" data-layer="terrain" checked />地图地形与影像</label>
+          <label><input type="checkbox" data-layer="buildingsTrees" checked />楼宇/树木</label>
+          <label><input type="checkbox" data-layer="riskZones" checked />人口/财产高风险区</label>
+          <label><input type="checkbox" data-layer="obstacleBuffers" checked />建筑禁入缓冲（15 m）</label>
+          <label><input type="checkbox" data-layer="safeMask" />全图安全掩膜</label>
+          <label><input type="checkbox" data-layer="wind" checked />风向量</label>
+          <label title="同时显示NED惯性坐标系、伞翼FRD机体系和载荷FRD机体系"><input type="checkbox" data-layer="axes" />惯性 / 机体坐标轴</label>
+          <label><input type="checkbox" data-layer="grid" />地面网格</label>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>
